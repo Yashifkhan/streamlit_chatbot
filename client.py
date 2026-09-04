@@ -2,9 +2,29 @@ import uuid
 
 import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage
-
+import uuid
 from server import workflow
 
+def generate_uuid():
+    thread_id=uuid.uuid4()
+    return thread_id
+
+def reset_chat():
+    thread_id=generate_uuid()
+    st.session_state.thread_id=thread_id
+    add_thread(st.session_state.thread_id)
+    st.session_state.messages=[]
+    
+    
+def add_thread(thread_id):
+    if thread_id not in st.session_state.chat_threads:
+        st.session_state.chat_threads.append(thread_id)
+    
+def load_conversion(thread_id):
+    print("thread_id",thread_id)
+    result= workflow.get_state(config={'configurable':{'thread_id':thread_id}}).values["messages"]
+    print("result --->>",result)
+    return result
 
 st.set_page_config(page_title="Chatbot", page_icon="💬")
 
@@ -16,7 +36,34 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "thread_id" not in st.session_state:
-    st.session_state.thread_id = str(uuid.uuid4())
+    st.session_state.thread_id = generate_uuid()
+
+if 'chat_threads' not in st.session_state:
+    st.session_state.chat_threads=[]
+add_thread(st.session_state.thread_id)
+
+st.sidebar.title("langGraph chatbot")
+
+if st.sidebar.button('New chat'):
+    reset_chat()
+    
+
+st.sidebar.header('MY conversations')
+
+for thread_id in st.session_state.chat_threads[::-1]:
+    if st.sidebar.button(str(thread_id)):
+        st.session_state.thread_id=thread_id
+        messages=load_conversion(thread_id)
+        print("messages",messages)
+        temp_messages=[]
+        for msg in messages:
+            print("msg",msg)
+            if isinstance(msg,HumanMessage):
+                role ="user "
+            else :
+                role = "assistent"
+            temp_messages.append({'role':role,'content':msg.content})
+        st.session_state.messages = messages
 
 
 # Display previous messages
@@ -43,15 +90,8 @@ if user_message:
 
     # Display assistant response
     with st.chat_message("assistant"):
-
         try:
-
-            config = {
-                "configurable": {
-                    "thread_id": st.session_state.thread_id
-                }
-            }
-
+            config = {"configurable": {"thread_id": st.session_state.thread_id}}
             response = workflow.stream(
                 {"messages": [human_message]},
                 config=config,
