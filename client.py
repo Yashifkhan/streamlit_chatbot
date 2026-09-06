@@ -3,7 +3,8 @@ import uuid
 import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage
 import uuid
-from server import workflow
+# from server import workow
+from main import workflow
 
 def generate_uuid():
     thread_id=uuid.uuid4()
@@ -22,9 +23,27 @@ def add_thread(thread_id):
     
 def load_conversion(thread_id):
     print("thread_id",thread_id)
-    result= workflow.get_state(config={'configurable':{'thread_id':thread_id}}).values["messages"]
+    state = workflow.get_state(config={'configurable': {'thread_id': thread_id}})
+    result = state.values.get("messages", [])
     print("result --->>",result)
     return result
+
+def get_chat_title(thread_id):
+    messages = load_conversion(thread_id)
+
+    for message in messages:
+        if isinstance(message, HumanMessage):
+            text = message.content.strip()
+
+            # Show first 10–15 words
+            words = text.split()
+
+            if len(words) > 15:
+                return " ".join(words[:15]) + "..."
+
+            return text
+
+    return "New conversation"
 
 st.set_page_config(page_title="Chatbot", page_icon="💬")
 
@@ -42,7 +61,7 @@ if 'chat_threads' not in st.session_state:
     st.session_state.chat_threads=[]
 add_thread(st.session_state.thread_id)
 
-st.sidebar.title("langGraph chatbot")
+st.sidebar.title("Emo v2 ")
 
 if st.sidebar.button('New chat'):
     reset_chat()
@@ -50,21 +69,36 @@ if st.sidebar.button('New chat'):
 
 st.sidebar.header('MY conversations')
 
-for thread_id in st.session_state.chat_threads[::-1]:
-    if st.sidebar.button(str(thread_id)):
-        st.session_state.thread_id=thread_id
-        messages=load_conversion(thread_id)
-        print("messages",messages)
-        temp_messages=[]
-        for msg in messages:
-            print("msg",msg)
-            if isinstance(msg,HumanMessage):
-                role ="user "
-            else :
-                role = "assistent"
-            temp_messages.append({'role':role,'content':msg.content})
-        st.session_state.messages = messages
+# for thread_id in st.session_state.chat_threads[::-1]:
+#     if st.sidebar.button(str(thread_id)):
+#         st.session_state.thread_id=thread_id
+#         messages=load_conversion(thread_id)
+#         print("messages",messages)
+#         temp_messages=[]
+#         for msg in messages:
+#             print("msg",msg)
+#             if isinstance(msg,HumanMessage):
+#                 role ="user "
+#             else :
+#                 role = "assistent"
+#             temp_messages.append({'role':role,'content':msg.content})
+#         st.session_state.messages = messages
 
+for thread_id in st.session_state.chat_threads[::-1]:
+    chat_title = get_chat_title(thread_id)          # <-- naya
+    if st.sidebar.button(chat_title, key=str(thread_id)):   # <-- label change + unique key zaroori
+        st.session_state.thread_id = thread_id
+        messages = load_conversion(thread_id)
+        print("messages", messages)
+        temp_messages = []
+        for msg in messages:
+            print("msg", msg)
+            if isinstance(msg, HumanMessage):
+                role = "user "
+            else:
+                role = "assistent"
+            temp_messages.append({'role': role, 'content': msg.content})
+        st.session_state.messages = messages
 
 # Display previous messages
 for message in st.session_state.messages:
@@ -114,6 +148,7 @@ if user_message:
                         full_response += content
 
                         message_placeholder.markdown(full_response)
+                        print("full_response",full_response)
 
             # Save final response to session state
             if full_response:
