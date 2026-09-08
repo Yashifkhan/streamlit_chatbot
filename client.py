@@ -125,7 +125,11 @@ if user_message:
     # Display assistant response
     with st.chat_message("assistant"):
         try:
-            config = {"configurable": {"thread_id": st.session_state.thread_id}}
+            config = {"configurable": {"thread_id": st.session_state.thread_id},
+                      "metadata":{"thread_id":st.session_state["thread_id"]},
+                      "run_name":"emo_chats"
+                      
+                      }
             response = workflow.stream(
                 {"messages": [human_message]},
                 config=config,
