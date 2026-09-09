@@ -5,10 +5,13 @@ from langchain_core.messages import HumanMessage, SystemMessage,BaseMessage
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.sqlite import SqliteSaver
 from pydantic import BaseModel, Field
+from langgraph.prebuilt import ToolNode, tools_condition
+# from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_community.tools import DuckDuckGoSearchRun
 from dotenv import load_dotenv
 import sqlite3
 import os
-
+from langchain_core.tools import tool 
 load_dotenv()
 
 conn=sqlite3.connect(database="chatbot.db",check_same_thread=False)
@@ -30,15 +33,78 @@ class chatState(TypedDict):
 check_pointer=SqliteSaver(conn=conn)
 graph=StateGraph(chatState)
 
-def chat_llm(state:chatState):
-    # prompt=f"you are a helpfull assistant,give the answer of user qustion {state['question']} "
-    messages=state['messages']
-    result=model.invoke(messages)
-    return {'messages':[result]}
 
+
+
+# tools 
+search_tool=DuckDuckGoSearchRun(region="us-en")
+
+# callculater tool 
+@tool
+def calculator(
+    first_num: float,
+    second_num: float,
+    operation: str
+) -> float:
+    """
+    Perform a basic arithmetic operation on two numbers.
+
+    Supported operations:
+    add, sub, mul, div
+    """
+
+    if operation == "add":
+        return first_num + second_num
+
+    elif operation == "sub":
+        return first_num - second_num
+
+    elif operation == "mul":
+        return first_num * second_num
+
+    elif operation == "div":
+        if second_num == 0:
+            raise ValueError("Division by zero is not allowed")
+
+        return first_num / second_num
+
+    else:
+        raise ValueError(
+            f"Unsupported operation: {operation}"
+        )
+
+# get stock price tool 
+
+@tool
+def get_stock_price(symbol: str) -> str:
+    """
+    Fetch the latest stock price for a given stock symbol.
+    Example: AAPL, TSLA
+    """
+    return f"Stock price data for {symbol}"
+
+# make tool list 
+tool_list=[get_stock_price,search_tool,calculator]
+# tool bind with llm 
+llm_with_tool=model.bind_tools(tool_list)
+
+
+# def chat_llm(state:chatState):
+#     # prompt=f"you are a helpfull assistant,give the answer of user qustion {state['question']} "
+#     messages=state['messages']
+#     result=model.invoke(messages)
+#     return {'messages':[result]}
+
+def chat_llm(state: chatState):
+    messages = state["messages"]
+    result = llm_with_tool.invoke(messages)
+    return {"messages": [result]}
+    
+tool_node=ToolNode(tool_list)
 graph.add_node('chat_llm',chat_llm)
 
 graph.add_edge(START,'chat_llm')
+graph.add_node("tool_node", tool_node)
 graph.add_edge('chat_llm',END)
 
 workflow=graph.compile(checkpointer=check_pointer)

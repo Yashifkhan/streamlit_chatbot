@@ -130,36 +130,44 @@ if user_message:
                       "run_name":"emo_chats"
                       
                       }
-            response = workflow.stream(
-                {"messages": [human_message]},
-                config=config,
-                stream_mode="messages"
-            )
-
-            # Placeholder for streaming text
-            message_placeholder = st.empty()
-
-            full_response = ""
-
-            for message_chunk, metadata in response:
-
-                # Only process AI messages
-                if isinstance(message_chunk, AIMessage):
-
-                    content = message_chunk.content
-
-                    if content:
-                        full_response += content
-
-                        message_placeholder.markdown(full_response)
-                        print("full_response",full_response)
-
-            # Save final response to session state
-            if full_response:
-                st.session_state.messages.append(
-                    AIMessage(content=full_response)
+        response = workflow.stream(
+        {"messages": [human_message]},
+        config=config,
+        stream_mode="messages"
                 )
 
-        except Exception as error:
+        message_placeholder = st.empty()
+        full_response = ""
 
+        for message_chunk, metadata in response:    
+            print("\n======================")
+            print("TYPE:", type(message_chunk).__name__)
+            print("NODE:", metadata.get("langgraph_node"))
+            print("CONTENT:", message_chunk.content)
+
+        if hasattr(message_chunk, "tool_calls"):
+        print("TOOL CALLS:", message_chunk.tool_calls)
+
+        print("======================")
+
+    # Only display actual assistant text
+        if isinstance(message_chunk, AIMessage):
+
+            content = message_chunk.content
+
+        if isinstance(content, str) and content:
+
+            full_response += content
+
+            message_placeholder.markdown(
+                full_response
+            )
+
+
+        if full_response:
+                st.session_state.messages.append(
+            AIMessage(content=full_response)
+        )
+
+        except Exception as error:
             st.error(f"Unable to get a response: {error}")
